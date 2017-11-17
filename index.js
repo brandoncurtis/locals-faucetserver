@@ -2,6 +2,10 @@ var express = require('express');
 var app = express();
 var cors = require('cors');
 var Web3 = require('web3');
+// HTTPS Server Stuff
+var fs = require('fs');
+var https = require('https');
+var http = require('http');
 var HookedWeb3Provider = require("hooked-web3-provider");
 var lightwallet = require("eth-lightwallet");
 var config = require('./config.json');
@@ -10,8 +14,25 @@ var Queue = require('firebase-queue');
 var myRootRef = new Firebase(config.firebase.url);
 
 var faucet_keystore = JSON.stringify(require("./wallet.json"));
-
 var secretSeed = lightwallet.keystore.generateRandomSeed();
+
+var tokenaddr = {
+  "zrx": "0x6ff6c0ff1d68b964901f986d4c9fa3ac68346570",
+  "mkr": "0x1dad4783cf3fe3085c1426157ab175a6119a04ba",
+  "mln": "0x323b5d4c32345ced77393b3530b1eed0f346429d",
+  "rep": "0xb18845c260f680d5b9d84649638813e342e4f8c9",
+  "dgd": "0xeee3870657e4716670f185df08652dd848fe8f7e",
+  "gnt": "0xef7fff64389b814a946f3e92105513705ca6b990"
+};
+
+var tokenamt = {
+  "zrx": "00000000000000000000000000000000000000000000000000b1a2bc2ec50000",
+  "mkr": "0000000000000000000000000000000000000000000000008ac7230489e80000",
+  "mln": "0000000000000000000000000000000000000000000000008ac7230489e80000",
+  "rep": "0000000000000000000000000000000000000000000000008ac7230489e80000",
+  "dgd": "0000000000000000000000000000000000000000000000008ac7230489e80000",
+  "gnt": "0000000000000000000000000000000000000000000000008ac7230489e80000"
+};
 
 // check for valid Eth address
 function isAddress(address) {
@@ -49,35 +70,45 @@ myRootRef.authWithCustomToken(config.firebase.secret, function(error, authData) 
 
 		lightwallet.keystore.deriveKeyFromPassword("test", function(err, pwDerivedKey) {
 
-			lightwallet.upgrade.upgradeOldSerialized(faucet_keystore, "testing", function(err, b) {
+			var keystore = new lightwallet.keystore.deserialize(faucet_keystore);
 
-				var keystore = new lightwallet.keystore.deserialize(b);
+			console.log('connecting to ETH node: ', config.web3.host);
 
-				console.log('connecting to ETH node: ', config.web3.host);
-
-				var web3Provider = new HookedWeb3Provider({
-					host: config.web3.host,
-					transaction_signer: keystore
-				});
-
-				web3 = new Web3();
-				web3.setProvider(web3Provider);
-
-				keystore.passwordProvider = function(callback) {
-					callback(null, "testing");
-				};
-
-				console.log("Wallet initted addr=" + keystore.getAddresses()[0]);
-
-				account = fixaddress(keystore.getAddresses()[0]);
-
-				// start webserver...
-				app.listen(config.httpport, function() {
-					console.log('Fawcet listening on port ', config.httpport);
-				});
-
+			var web3Provider = new HookedWeb3Provider({
+				host: config.web3.host,
+				transaction_signer: keystore
 			});
 
+			web3 = new Web3();
+			web3.setProvider(web3Provider);
+
+			keystore.passwordProvider = function(callback) {
+				callback(null, "testing");
+			};
+
+			console.log("Wallet initted addr=" + keystore.getAddresses()[0]);
+
+			account = fixaddress(keystore.getAddresses()[0]);
+
+			// start webserver...
+			//app.listen(config.httpport, function() {
+			//	console.log('Fawcet listening on port ', config.httpport);
+			//});
+      // NEW WEBSERVER STUFF
+
+      // HTTPS Server Stuff
+      var key = fs.readFileSync('/etc/letsencrypt/live/faucet.tokenpla.net/privkey.pem');
+      var cert = fs.readFileSync('/etc/letsencrypt/live/faucet.tokenpla.net/fullchain.pem');
+      var ca = fs.readFileSync('/home/brandon/repos/locals-faucetserver/static/locals-faucet/app/isrgrootx1.pem');
+      var httpsopts = {
+        key: key,
+        cert: cert,
+        ca: ca
+      };
+
+      // CREATE HTTPS SERVER
+      https.createServer(httpsopts, app).listen(3001);
+      http.createServer(app).listen(3000);
 		});
 	}
 });
@@ -91,10 +122,25 @@ function getFaucetBalance(denomination) {
 	return parseFloat(web3.fromWei(web3.eth.getBalance(account).toNumber(), denomination || 'ether'));
 }
 
-app.use(cors());
+//app.use(cors());
+app.use(cors(), function(req, res, next) {
+  if (req.secure) {
+    next();
+  } else {
+    res.redirect('https://' + req.headers.host + req.url);
+  }
+});
 
 // polymer app is served from here
-app.use(express.static('static/locals-faucet/dist'));
+//app.use(express.static('static/locals-faucet/dist'));
+// HTTP → HTTPS Redirect
+app.use(express.static('static/locals-faucet/dist'), function(req, res, next) {
+  if (req.secure) {
+    next();
+  } else {
+    res.redirect('https://' + req.headers.host + req.url);
+  }
+});
 
 var randomQueueName = "queue" + Date.now();
 var blacklistName = "blacklist";
@@ -113,6 +159,8 @@ app.get('/faucetinfo', function(req, res) {
 		etherscanroot: config.etherscanroot,
 		payoutfrequencyinsec: config.payoutfrequencyinsec,
 		payoutamountinether: config.payoutamountinether,
+    payoutamountintokens: config.payoutamountintokens,
+    payoutamountinzrx: config.payoutamountinzrx,
 		queuesize: config.queuesize,
 		queuename: randomQueueName
 	});
@@ -136,19 +184,16 @@ var queue = new Queue(queueRef, options, function(data, progress, resolve, rejec
 
 	// if (nextpayout - getTimeStamp() > 0) {
 	// need to wait 
-
 	var delay = data.paydate - getTimeStamp();
-
 	console.log('next payout in ', delay, 'sec');
 
 	if (delay < 0) {
 		delay = 0;
 	}
-
 	setTimeout(function() {
 
 
-		donate(data.address, function(err, result) {
+		donate(data.address, data.token, function(err, result) {
 			if (err) {
 				console.log(err);
 				reject();
@@ -163,9 +208,7 @@ var queue = new Queue(queueRef, options, function(data, progress, resolve, rejec
 				resolve();
 				console.log('resolved');
 			}, 20 * 1000);
-
 		});
-
 
 	}, delay * 1000);
 
@@ -186,9 +229,10 @@ app.get('/blacklist/:address', function(req, res) {
 });
 
 // add our address to the donation queue
-app.get('/donate/:address', function(req, res) {
+app.get('/donate/:token/:address', function(req, res) {
 	console.log('push');
 
+  var token = req.params.token;
 	var address = fixaddress(req.params.address);
 	if (isAddress(address)) {
 		blacklist.child(address).once('value', function(snapshot) {
@@ -201,7 +245,6 @@ app.get('/donate/:address', function(req, res) {
 				});
 			}
 
-
 			var queuetasks = queueRef.child('tasks');
 			queuetasks.once('value', function(snap) {
 
@@ -213,15 +256,13 @@ app.get('/donate/:address', function(req, res) {
 				var queueitem = {
 					paydate: nextdrip,
 					address: address,
-					amount: 1 * 1e18
+					amount: 1 * 1e18,
+          token: token
 				};
 
 				var list = snap.val();
-
 				if (list) {
-
 					var length = Object.keys(list).length;
-
 					if (length >= config.queuesize) {
 						// queue is full - reject request
 						return res.status(403).json({
@@ -233,12 +274,8 @@ app.get('/donate/:address', function(req, res) {
 				queuetasks.push(queueitem);
 				nextdrip += config.payoutfrequencyinsec;
 				return res.status(200).json(queueitem);
-
 			});
-
 		});
-
-
 
 	} else {
 		return res.status(400).json({
@@ -251,23 +288,38 @@ app.get('/donate/:address', function(req, res) {
 
 });
 
-function donate(to, cb) {
+function donate(to, token, cb) {
 
 	web3.eth.getGasPrice(function(err, result) {
 
 		var gasPrice = result.toNumber(10);
 		console.log('gasprice is ', gasPrice);
 
-		var amount = config.payoutamountinether * 1e18;
-		console.log("Transferring ", amount, "wei from", account, 'to', to);
+		var amount;
+		console.log("Transferring ", token, "=", amount, "wei from", account, 'to', to);
 
-		var options = {
-			from: account,
-			to: to,
-			value: amount,
-			gas: 314150,
-			gasPrice: gasPrice,
-		};
+    var options;
+
+    if (token === 'eth') {
+      amount = config.payoutamountinether * 1e18;
+		  options = {
+			  from: account,
+			  to: to,
+			  value: amount,
+			  gas: 314150,
+			  gasPrice: gasPrice,
+		  };
+    } else {
+		  options = {
+			  from: account,
+			  to: tokenaddr[token],
+			  value: 0,
+			  gas: 314150,
+			  gasPrice: gasPrice,
+        data: "0xa9059cbb000000000000000000000000" + to.substring(2) + tokenamt[token]
+		  };
+    }
+
 		console.log(options);
 		web3.eth.sendTransaction(options, function(err, result) {
 
@@ -280,7 +332,6 @@ function donate(to, cb) {
 			}
 
 			return cb(err, result);
-
 
 		});
 	});

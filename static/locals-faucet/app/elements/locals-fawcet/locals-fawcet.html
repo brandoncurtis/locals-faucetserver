@@ -110,37 +110,49 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </style>
 
     <div class="canvas">
-      <h1>Ethereum Ropsten Faucet</h1>
+      <h1>Ethereum Kovan Faucet</h1>
       <!-- <p>Testnet Helicopter money</p> -->
       <div class="whitespace"></div>
 
       <locals-input bind-value="{{address}}" label="Enter your testnet account address"></locals-input>
+      <paper-dropdown-menu bind-value="{{token}}" label="which asset would you like?">
+       <paper-menu class="dropdown-content" selected="1" attr-for-selected="data-value">
+          <paper-item data-value="1">eth</paper-item>
+          <paper-item data-value="2">zrx</paper-item>
+          <paper-item data-value="3">mkr</paper-item>
+          <paper-item data-value="4">mln</paper-item>
+          <paper-item data-value="5">rep</paper-item>
+          <paper-item data-value="6">dgd</paper-item>
+          <paper-item data-value="7">gnt</paper-item>
+        </paper-menu>
+      </paper-dropdown-menu>
+
+
       <div class="whitespace"></div>
-      <locals-button on-tap="sendether">Send me 1 test ether!</locals-button>
+      <locals-button on-tap="sendether">Send me testnet tokens!</locals-button>
       <br>
       <template is="dom-if" if="{{faucetresponse}}">       
           <div class="queue">
             <p>{{faucetresponse}}</p>
           </div>
       </template>
+      <div>
+        This faucet drips every 60 seconds. Payout is {{faucetinfo.payoutamountinether}} Ether, {{faucetinfo.payoutamountinzrx}} ZRX, or {{faucetinfo.payoutamountintokens}} other tokens.
+      </div>
       <small>
-        This faucet drips {{faucetinfo.payoutamountinether}} Ether every {{faucetinfo.payoutfrequencyinsec}} seconds. You can register your account in our queue. Max queue size is currently {{faucetinfo.queuesize}}
-      </small>
-      .
-      <small>
-        Serving from account
-        <a target="_new" href="{{faucetinfo.etherscanroot}}/address/{{faucetinfo.account}}">{{faucetinfo.account}}</a>
-        ( balance {{formatnumber(faucetinfo.balance)}} ETH )
+        These tokens have no monetary value! Please take only what you need for testing purposes.
       </small>
       <br>
       <small>
-        Example command line: wget http://faucet.ropsten.be:3001/donate/&lt;your ethereum address&gt;
+        Add your address to the queue, and we'll send some soon! The maximum queue length is {{faucetinfo.queuesize}} requests.
       </small>
-
       <br>
       <small>
-        Example REST API: http://faucet.ropsten.be:3001/donate/&lt;your ethereum address&gt;
-        <a href="https://github.com/locals-world/locals-faucetserver#api">API docs</a>
+        The current balance of our faucet account, <a target="_new" href="{{faucetinfo.etherscanroot}}/address/{{faucetinfo.account}}">{{faucetinfo.account}}</a>, is {{formatnumber(faucetinfo.balance)}} ETH.
+      </small>
+      <br>
+      <small>
+        For even more, <a href="https://tokenpla.net/asset/kovan/">request 6 Kovan Ether per day with your GitHub account.</a>
       </small>
 
       <iron-ajax
@@ -165,15 +177,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         <div class="queue">
           <p>Faucet queue</p>
             <firebase-app 
-                api-key="AIzaSyBrC_eXWYe3TK9JEws6MIj9ZHmbezrx-AA",
-                auth-domain="testnet-eth-faucet.firebaseapp.com",
-                database-url="https://testnet-eth-faucet.firebaseio.com"
-                name="testnet-eth-faucet"
+                api-key="xrYNXgQm8eTuwnj3jPHCoQdWk9VaHtoVPoYTPx83",
+                auth-domain="faucet-43eed.firebaseapp.com",
+                database-url="https://faucet-43eed.firebaseio.com"
+                name="faucet-43eed"
               >
             </firebase-app>
             <firebase-query
                 id="query"
-                app-name="testnet-eth-faucet"
+                app-name="faucet-43eed"
                 path="/{{faucetinfo.queuename}}/tasks"
                 data="{{queue}}">
             </firebase-query>
@@ -186,12 +198,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               <locals-item>
                 
                 <template is="dom-if" if="[[donation.txhash]]">
-                  <small>Ether sent to</small>
+                  <small>Assets sent to</small>
                   <p>Address <a target="_new" href="{{faucetinfo.etherscanroot}}/address/{{donation.address}}">[[donation.address]]</a></p>
                   <p>TxHash <a target="_new" href="{{faucetinfo.etherscanroot}}/tx/{{donation.txhash}}">{{donation.txhash}}</a></p>
                 </template>
                 <template is="dom-if" if="[[!donation.txhash]]">
-                  <small>Ether will be sent to</small>
+                  <small>Assets will be sent to</small>
                   <p>Address <a target="_new" href="{{faucetinfo.etherscanroot}}/address/{{donation.address}}">[[donation.address]]</a></p>
                   <p class="time">on {{_formatunixts(donation.paydate)}}</p>
                 </template>
@@ -202,7 +214,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       </template>
 
       <div class="fromalabswithlove">
-        <p>This component is proudly brought to you by</p>
+				<p>Extended and deployed by Brandon Curtis based on a component from</p>
         <div class="alabs">
           <img src="../../images/A-LabsLogo.svg">
           <a href="//github.com/locals-world">A-Labs</a>
@@ -231,7 +243,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       },
 
       sendether: function() {
-        this.$.ajax.url = 'donate/' + this.address;
+        this.$.ajax.url = 'donate/' + this.token + '/' + this.address;
         this.$.ajax.generateRequest();
       },
 
@@ -253,7 +265,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
       hresponseInit: function(request) {
         this.faucetinfo = request.detail.response;
-        this.firebasequeue = 'https://testnet-eth-faucet.firebaseio.com/'+this.faucetinfo.queuename+'/tasks';
+        this.firebasequeue = 'https://faucet-43eed.firebaseio.com/'+this.faucetinfo.queuename+'/tasks';
       },
 
       _formatunixts: function(unix_timestamp){
