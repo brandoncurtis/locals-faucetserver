@@ -22,16 +22,22 @@ var tokenaddr = {
   "mln": "0x323b5d4c32345ced77393b3530b1eed0f346429d",
   "rep": "0xb18845c260f680d5b9d84649638813e342e4f8c9",
   "dgd": "0xeee3870657e4716670f185df08652dd848fe8f7e",
-  "gnt": "0xef7fff64389b814a946f3e92105513705ca6b990"
+  "gnt": "0xef7fff64389b814a946f3e92105513705ca6b990",
+  "dai": "0xc4375b7de8af5a38a93548eb8453a498222c4ff2"
 };
 
+// 0.1: 000000000000000000000000000000000000000000000000016345785D8A0000
+// 1.0: 0000000000000000000000000000000000000000000000000de0b6b3a7640000
+// 10:  0000000000000000000000000000000000000000000000008ac7230489e80000
+// 100: 0000000000000000000000000000000000000000000000056bc75e2d63100000
 var tokenamt = {
-  "zrx": "00000000000000000000000000000000000000000000000000b1a2bc2ec50000",
-  "mkr": "0000000000000000000000000000000000000000000000008ac7230489e80000",
-  "mln": "0000000000000000000000000000000000000000000000008ac7230489e80000",
-  "rep": "0000000000000000000000000000000000000000000000008ac7230489e80000",
-  "dgd": "0000000000000000000000000000000000000000000000008ac7230489e80000",
-  "gnt": "0000000000000000000000000000000000000000000000008ac7230489e80000"
+  "zrx": "000000000000000000000000000000000000000000000000016345785D8A0000",
+  "mkr": "0000000000000000000000000000000000000000000000056bc75e2d63100000",
+  "mln": "0000000000000000000000000000000000000000000000056bc75e2d63100000",
+  "rep": "0000000000000000000000000000000000000000000000056bc75e2d63100000",
+  "dgd": "0000000000000000000000000000000000000000000000056bc75e2d63100000",
+  "gnt": "0000000000000000000000000000000000000000000000056bc75e2d63100000",
+  "dai": "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
 };
 
 // check for valid Eth address
@@ -99,7 +105,7 @@ myRootRef.authWithCustomToken(config.firebase.secret, function(error, authData) 
       // HTTPS Server Stuff
       var key = fs.readFileSync('/etc/letsencrypt/live/faucet.tokenpla.net/privkey.pem');
       var cert = fs.readFileSync('/etc/letsencrypt/live/faucet.tokenpla.net/fullchain.pem');
-      var ca = fs.readFileSync('/home/brandon/repos/locals-faucetserver/static/locals-faucet/app/isrgrootx1.pem');
+      var ca = fs.readFileSync('/home/brandon/repo/locals-faucetserver/static/locals-faucet/app/isrgrootx1.pem');
       var httpsopts = {
         key: key,
         cert: cert,
@@ -107,8 +113,8 @@ myRootRef.authWithCustomToken(config.firebase.secret, function(error, authData) 
       };
 
       // CREATE HTTPS SERVER
-      https.createServer(httpsopts, app).listen(3001);
-      http.createServer(app).listen(3000);
+      https.createServer(httpsopts, app).listen(3002);
+      http.createServer(app).listen(3001);
 		});
 	}
 });
@@ -159,8 +165,9 @@ app.get('/faucetinfo', function(req, res) {
 		etherscanroot: config.etherscanroot,
 		payoutfrequencyinsec: config.payoutfrequencyinsec,
 		payoutamountinether: config.payoutamountinether,
-    payoutamountintokens: config.payoutamountintokens,
-    payoutamountinzrx: config.payoutamountinzrx,
+		payoutamountintokens: config.payoutamountintokens,
+		payoutamountinzrx: config.payoutamountinzrx,
+		payoutamountindai: config.payoutamountindai,
 		queuesize: config.queuesize,
 		queuename: randomQueueName
 	});
@@ -292,11 +299,16 @@ function donate(to, token, cb) {
 
 	web3.eth.getGasPrice(function(err, result) {
 
-		var gasPrice = result.toNumber(10);
-		console.log('gasprice is ', gasPrice);
+		var gasPrice = 1000000000;
+		//var gasPrice = result.toNumber(10);
+		console.log('calculated gas price is', gasPrice/1000000000, 'gwei');
+                //if (gasPrice < 12000000000) {
+		//	console.log('defaulting to minimum gas price of 12 gwei');
+		//	gasPrice = 12000000000;
+		//}
 
 		var amount;
-		console.log("Transferring ", token, "=", amount, "wei from", account, 'to', to);
+		console.log("Transferring", token, "=", amount, "wei from", account, 'to', to);
 
     var options;
 
@@ -319,6 +331,9 @@ function donate(to, token, cb) {
         data: "0xa9059cbb000000000000000000000000" + to.substring(2) + tokenamt[token]
 		  };
     }
+//		if (amount == 0) {
+//			options.data = "0x"
+//		}
 
 		console.log(options);
 		web3.eth.sendTransaction(options, function(err, result) {
@@ -326,6 +341,7 @@ function donate(to, token, cb) {
 			if (err != null) {
 				console.log(err);
 				console.log("ERROR: Transaction didn't go through. See console.");
+				console.log(result);
 			} else {
 				console.log("Transaction Successful!");
 				console.log(result);

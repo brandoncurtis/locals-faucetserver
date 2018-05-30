@@ -118,12 +118,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <paper-dropdown-menu bind-value="{{token}}" label="which asset would you like?">
        <paper-menu class="dropdown-content" selected="1" attr-for-selected="data-value">
           <paper-item data-value="1">eth</paper-item>
-          <paper-item data-value="2">zrx</paper-item>
-          <paper-item data-value="3">mkr</paper-item>
-          <paper-item data-value="4">mln</paper-item>
-          <paper-item data-value="5">rep</paper-item>
-          <paper-item data-value="6">dgd</paper-item>
-          <paper-item data-value="7">gnt</paper-item>
+          <paper-item data-value="2">dai</paper-item>
+          <paper-item data-value="3">zrx</paper-item>
+          <paper-item data-value="4">mkr</paper-item>
+          <paper-item data-value="5">mln</paper-item>
+          <paper-item data-value="6">rep</paper-item>
+          <paper-item data-value="7">dgd</paper-item>
+          <paper-item data-value="8">gnt</paper-item>
         </paper-menu>
       </paper-dropdown-menu>
 
@@ -137,7 +138,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           </div>
       </template>
       <div>
-        This faucet drips every 60 seconds. Payout is {{faucetinfo.payoutamountinether}} Ether, {{faucetinfo.payoutamountinzrx}} ZRX, or {{faucetinfo.payoutamountintokens}} other tokens.
+        This faucet drips every 60 seconds. Payout is {{faucetinfo.payoutamountinether}} Ether, {{faucetinfo.payoutamountindai}} Dai, {{faucetinfo.payoutamountinzrx}} ZRX, or {{faucetinfo.payoutamountintokens}} other tokens.
       </div>
       <small>
         These tokens have no monetary value! Please take only what you need for testing purposes. Donations appreciated!
